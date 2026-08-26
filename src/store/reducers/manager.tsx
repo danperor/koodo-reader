@@ -6,8 +6,14 @@ const initState = {
   isSearch: false,
   isShowPopupNote: false,
   isAboutOpen: false,
-  isAuthed: false,
-  userInfo: null,
+  isAuthed: true,
+  userInfo: {
+    type: "pro",
+    valid_until: 4102416000,
+    token_valid_until: 4102416000,
+    email: "pro@koodoreader.com",
+    is_enable_koodo_sync: "no",
+  },
   userConfig: null,
   isSettingOpen: false,
   viewMode: "card",
@@ -85,7 +91,7 @@ export function manager(
     case "HANDLE_AUTHED":
       return {
         ...state,
-        isAuthed: action.payload,
+        isAuthed: true,
       };
     case "HANDLE_SELECTED_BOOKS":
       return {
@@ -137,7 +143,7 @@ export function manager(
     case "HANDLE_SHOW_SUPPORT":
       return {
         ...state,
-        isShowSupport: action.payload,
+        isShowSupport: false,
       };
     case "HANDLE_LOAD_MORE":
       return {

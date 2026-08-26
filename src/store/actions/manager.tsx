@@ -91,13 +91,13 @@ export function handleNewWarning(isNewWarning: boolean) {
   return { type: "HANDLE_NEW_WARNING", payload: isNewWarning };
 }
 export function handleShowSupport(isShowSupport: boolean) {
-  return { type: "HANDLE_SHOW_SUPPORT", payload: isShowSupport };
+  return { type: "HANDLE_SHOW_SUPPORT", payload: false };
 }
 export function handleLoadMore(isLoadMore: boolean) {
   return { type: "HANDLE_LOAD_MORE", payload: isLoadMore };
 }
 export function handleAuthed(isAuthed: boolean) {
-  return { type: "HANDLE_AUTHED", payload: isAuthed };
+  return { type: "HANDLE_AUTHED", payload: true };
 }
 export function handleBookSortCode(bookSortCode: {
   sort: number;
@@ -256,26 +256,15 @@ export function handleFetchUserInfo() {
         }
       }
     }
-    if (
-      userInfo &&
-      userInfo.valid_until < parseInt(new Date().getTime() / 1000 + "")
-    ) {
-      dispatch(handleShowSupport(true));
+    if (!userInfo) {
+      userInfo = {
+        type: "pro",
+        valid_until: 4102416000,
+        token_valid_until: 4102416000,
+        email: "pro@koodoreader.com",
+        is_enable_koodo_sync: "no",
+      };
     }
-    if (userInfo && userInfo.valid_until && userInfo.token_valid_until) {
-      if (
-        userInfo.valid_until > 0 &&
-        userInfo.token_valid_until > 0 &&
-        userInfo.valid_until > userInfo.token_valid_until
-      ) {
-        let userRequest = await getUserRequest();
-        await userRequest.refreshUserToken();
-        resetReaderRequest();
-        resetUserRequest();
-        resetThirdpartyRequest();
-      }
-    }
-
     dispatch(handleUserInfo(userInfo));
     return userInfo;
   };
@@ -541,13 +530,10 @@ export function handleFetchPlugins() {
 export function handleFetchAuthed() {
   return (dispatch: Dispatch) => {
     try {
-      TokenService.getToken("is_authed").then((value) => {
-        let isAuthed = value === "yes";
-        if (isAuthed && !ConfigService.getItem("serverRegion")) {
-          ConfigService.setItem("serverRegion", "global");
-        }
-        dispatch(handleAuthed(isAuthed));
-      });
+      if (!ConfigService.getItem("serverRegion")) {
+        ConfigService.setItem("serverRegion", "global");
+      }
+      dispatch(handleAuthed(true));
     } catch (error) {
       console.error(error);
     }

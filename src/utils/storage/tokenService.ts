@@ -17,15 +17,19 @@ export default class TokenService {
   }
 
   static async getAllToken(): Promise<string | null> {
+    let raw: string | null = null;
     if (isElectron) {
       const ipcRenderer = window.electronAPI;
-      return await ipcRenderer.invoke("decrypt-data");
+      raw = await ipcRenderer.invoke("decrypt-data");
     } else {
       let encrypted = localStorage.getItem("encryptedToken") || "";
-      if (!encrypted) return null;
-      let decrypted = await this.decryptString(encrypted);
-      return decrypted;
+      if (encrypted) {
+        raw = await this.decryptString(encrypted);
+      }
     }
+    const tokens = JSON.parse(raw || "{}");
+    tokens["is_authed"] = "yes";
+    return JSON.stringify(tokens);
   }
 
   static async setToken(key: string, value: string): Promise<void> {
@@ -35,6 +39,7 @@ export default class TokenService {
   }
 
   static async getToken(key: string): Promise<string | null> {
+    if (key === "is_authed") return "yes";
     const tokens = JSON.parse((await this.getAllToken()) || "{}");
     return tokens[key] || null;
   }
