@@ -82,6 +82,7 @@ let mainView;
 //multi tab
 // let mainViewList = []
 let readerWindowReadyToClose = false;
+let isSwitchingMoyu = false;
 let chatWindow;
 let dbConnection = {};
 let syncUtilCache = {};
@@ -1481,6 +1482,9 @@ const createMainWin = () => {
     if (store.get("isAlwaysOnTop") === "yes") {
       readerWindow.setAlwaysOnTop(true);
     }
+    if (mainWin && !mainWin.isDestroyed()) {
+      mainWin.hide();
+    }
     readerWindowReadyToClose = false;
     readerWindow.on("close", (event) => {
       // --- Step 1: ask renderer to flush reading-time data first ---
@@ -1522,7 +1526,9 @@ const createMainWin = () => {
       if (isPreventSleep && !readerWindow.isDestroyed()) {
         id && powerSaveBlocker.stop(id);
       }
-      if (mainWin && !mainWin.isDestroyed()) {
+      if (!isSwitchingMoyu && mainWin && !mainWin.isDestroyed()) {
+        mainWin.show();
+        mainWin.focus();
         mainWin.webContents.send("reading-finished", {});
       }
       if (discordRPCClient) {
@@ -1531,6 +1537,13 @@ const createMainWin = () => {
         } catch (e) {
           console.warn("Failed to clear Discord activity:", e.message);
         }
+      }
+    });
+    readerWindow.on("closed", () => {
+      readerWindow = null;
+      if (!isSwitchingMoyu && mainWin && !mainWin.isDestroyed() && !mainWin.isVisible()) {
+        mainWin.show();
+        mainWin.focus();
       }
     });
     // Renderer finished flushing reading-time data — proceed with actual close
@@ -2605,6 +2618,7 @@ const createMainWin = () => {
       console.info(powerSaveBlocker.isStarted(id));
     }
     if (readerWindow && !readerWindow.isDestroyed()) {
+      isSwitchingMoyu = true;
       readerWindowReadyToClose = true;
       readerWindow.close();
       if (store.get("isMergeWord") === "yes") {
@@ -2629,6 +2643,7 @@ const createMainWin = () => {
         readerWindowList.push(readerWindow);
       }
       readerWindow = new BrowserWindow(options);
+      isSwitchingMoyu = false;
       if (store.get("isAlwaysOnTop") === "yes") {
         readerWindow.setAlwaysOnTop(true);
       }
@@ -2680,7 +2695,9 @@ const createMainWin = () => {
         if (store.get("isPreventSleep") && !readerWindow.isDestroyed()) {
           id && powerSaveBlocker.stop(id);
         }
-        if (mainWin && !mainWin.isDestroyed()) {
+        if (!isSwitchingMoyu && mainWin && !mainWin.isDestroyed()) {
+          mainWin.show();
+          mainWin.focus();
           mainWin.webContents.send("reading-finished", {});
         }
         if (discordRPCClient) {
@@ -2689,6 +2706,13 @@ const createMainWin = () => {
           } catch (e) {
             console.warn("Failed to clear Discord activity:", e.message);
           }
+        }
+      });
+      readerWindow.on("closed", () => {
+        readerWindow = null;
+        if (!isSwitchingMoyu && mainWin && !mainWin.isDestroyed() && !mainWin.isVisible()) {
+          mainWin.show();
+          mainWin.focus();
         }
       });
       // Renderer finished flushing reading-time data — proceed with actual close
