@@ -12,16 +12,79 @@ import { resetUserRequest } from "./user";
 import { resetThirdpartyRequest } from "./thirdparty";
 import { isElectron } from "react-device-detect";
 import TokenService from "../storage/tokenService";
+import packageInfo from "../../../package.json";
 const PUBLIC_URL = "https://api.koodoreader.com";
 const CN_PUBLIC_URL = "https://api.koodoreader.cn";
 export const getPublicUrl = () => {
   return getServerRegion() === "china" ? CN_PUBLIC_URL : PUBLIC_URL;
 };
+
+export const FORK_REPO_OWNER = "danperor";
+export const FORK_REPO_NAME = "koodo-reader";
+export const FORK_REPO_URL = `https://github.com/${FORK_REPO_OWNER}/${FORK_REPO_NAME}`;
+export const FORK_RELEASES_URL = `${FORK_REPO_URL}/releases`;
+export const FORK_API_LATEST_RELEASE = `https://api.github.com/repos/${FORK_REPO_OWNER}/${FORK_REPO_NAME}/releases/latest`;
+
+export const checkForkUpdate = async () => {
+  try {
+    const res = await axios.get(FORK_API_LATEST_RELEASE, {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+      },
+      timeout: 8000,
+    });
+    if (res.data && res.data.tag_name) {
+      const tag = res.data.tag_name;
+      const version = tag.replace(/^v/, "");
+      const body = res.data.body || "";
+      const lines = body
+        .split("\n")
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length > 0 && !s.startsWith("#"));
+      let downloadUrl = res.data.html_url || FORK_RELEASES_URL;
+      if (Array.isArray(res.data.assets) && res.data.assets.length > 0) {
+        const exeAsset = res.data.assets.find(
+          (a: any) =>
+            a.name && (a.name.endsWith(".exe") || a.name.endsWith(".zip"))
+        );
+        if (exeAsset?.browser_download_url) {
+          downloadUrl = exeAsset.browser_download_url;
+        }
+      }
+      return {
+        version,
+        stable: "yes",
+        stable_version: version,
+        skippable: "yes",
+        new: lines.length > 0 ? lines : [res.data.name || `Release ${tag}`],
+        fix: [],
+        downloadUrl,
+      };
+    }
+  } catch (error) {
+    return {
+      version: packageInfo.version,
+      stable: "yes",
+      stable_version: packageInfo.version,
+      skippable: "yes",
+      new: [],
+      fix: [],
+      downloadUrl: FORK_RELEASES_URL,
+    };
+  }
+  return {
+    version: packageInfo.version,
+    stable: "yes",
+    stable_version: packageInfo.version,
+    skippable: "yes",
+    new: [],
+    fix: [],
+    downloadUrl: FORK_RELEASES_URL,
+  };
+};
+
 export const checkDeveloperUpdate = async () => {
-  let res = await axios.get(
-    getPublicUrl() + `/api/update_dev?name=${navigator.language}`
-  );
-  return res.data.log;
+  return await checkForkUpdate();
 };
 export const uploadFile = async (url: string, file: any) => {
   return new Promise<boolean>((resolve) => {
@@ -37,10 +100,7 @@ export const uploadFile = async (url: string, file: any) => {
   });
 };
 export const checkStableUpdate = async () => {
-  let res = await axios.get(
-    getPublicUrl() + `/api/update?name=${navigator.language}`
-  );
-  return res.data.log;
+  return await checkForkUpdate();
 };
 export const handleExitApp = async () => {
   toast.error(i18n.t("Authorization failed, please login again"));

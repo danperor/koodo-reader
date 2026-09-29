@@ -791,7 +791,10 @@ const createMainWin = () => {
       return;
     }
 
-    let url = `https://dl.koodoreader.com/v${config.version}/Koodo-Reader-${config.version}-${arch}.exe`;
+    let url = config.downloadUrl;
+    if (!url || !url.startsWith("http")) {
+      return;
+    }
     const https = require("https");
     const { spawn } = require("child_process");
     const file = fs.createWriteStream(path.join(app.getPath("temp"), fileName));

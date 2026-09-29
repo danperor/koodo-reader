@@ -38,10 +38,17 @@ class UpdateInfo extends React.Component<UpdateInfoProps, UpdateInfoState> {
         return;
       }
       let res;
-      if (ConfigService.getReaderConfig("updateChannel") === "stable") {
-        res = await checkStableUpdate();
-      } else {
-        res = await checkDeveloperUpdate();
+      try {
+        if (ConfigService.getReaderConfig("updateChannel") === "stable") {
+          res = await checkStableUpdate();
+        } else {
+          res = await checkDeveloperUpdate();
+        }
+      } catch (e) {
+        return;
+      }
+      if (!res || !res.version) {
+        return;
       }
       const newVersion = res.version;
       const stableVersion = res.stable_version || "1.0.0";
@@ -164,103 +171,26 @@ class UpdateInfo extends React.Component<UpdateInfoProps, UpdateInfoState> {
                 <div
                   className="new-version-open"
                   onClick={() => {
-                    if (isWindows) {
-                      const ipcRenderer = window.electronAPI;
-                      if (!this.state.isDownloading) {
-                        // 先注册事件监听器，再调用下载
-                        this.setState({ isDownloading: true });
-                        ipcRenderer.on(
-                          "download-app-progress",
-                          (config: any) => {
-                            this.setState({
-                              progress: config.progress,
-                              downloadedMB: config.downloadedMB,
-                              totalMB: config.totalMB,
-                            });
-                            toast.loading(
-                              this.props.t("Downloading") +
-                                `(${config.downloadedMB} / ${config.totalMB} MB)`,
-                              {
-                                id: "download-progress",
-                                position: "bottom-center",
-                              }
-                            );
-                          }
-                        );
-                        ipcRenderer.invoke("update-win-app", {
-                          version: this.state.updateLog.version,
-                        });
-                      } else {
-                        ipcRenderer.invoke("cancel-download-app", {});
-                        this.setState({
-                          isDownloading: false,
-                          progress: 0,
-                          downloadedMB: 0,
-                          totalMB: 0,
-                        });
-                        setTimeout(() => {
-                          toast.success(
-                            this.props.t("Cancellation successful"),
-                            {
-                              id: "download-progress",
-                            }
-                          );
-                        }, 500);
-                      }
-                    } else {
-                      let lang = "en";
-                      if (
-                        ConfigService.getReaderConfig("lang") &&
-                        ConfigService.getReaderConfig("lang").startsWith("zh")
-                      ) {
-                        lang = "zh";
-                      }
-                      openExternalUrl(
-                        getWebsiteUrl() +
-                          "/" +
-                          lang +
-                          "/download" +
-                          "?version=" +
-                          (this.state.updateLog.stable === "yes"
-                            ? "stable"
-                            : "developer")
-                      );
-                    }
-                  }}
-                >
-                  {this.state.isDownloading ? (
-                    <Trans>Cancel</Trans>
-                  ) : (
-                    <Trans>Download</Trans>
-                  )}
-                </div>
-              </div>
-              {isWindows && (
-                <div
-                  className="new-version-skip"
-                  onClick={() => {
-                    let lang = "en";
-                    if (
-                      ConfigService.getReaderConfig("lang") &&
-                      ConfigService.getReaderConfig("lang").startsWith("zh")
-                    ) {
-                      lang = "zh";
-                    }
                     openExternalUrl(
-                      getWebsiteUrl() +
-                        "/" +
-                        lang +
-                        "/download" +
-                        "?version=" +
-                        (this.state.updateLog.stable === "yes"
-                          ? "stable"
-                          : "developer")
+                      this.state.updateLog?.downloadUrl ||
+                        "https://github.com/danperor/koodo-reader/releases"
                     );
                   }}
                 >
-                  <Trans>Download in Browser</Trans>
+                  <Trans>Download</Trans>
                 </div>
-              )}
+              </div>
+              <div
+                className="new-version-skip"
+                onClick={() => {
+                  openExternalUrl(
+                    this.state.updateLog?.downloadUrl ||
+                      "https://github.com/danperor/koodo-reader/releases"
+                  );
+                }}
+              >
+                <Trans>Download in Browser</Trans>
+              </div>
               {this.state.updateLog.stable !== "yes" && (
                 <div
                   className="new-version-skip"

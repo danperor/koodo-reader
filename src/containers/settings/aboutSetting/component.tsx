@@ -5,10 +5,14 @@ import toast from "react-hot-toast";
 import { ConfigService } from "../../../assets/lib/kookit-extra-browser.min";
 import packageJson from "../../../../package.json";
 
-import { getWebsiteUrl, openExternalUrl } from "../../../utils/common";
+import { compareVersions, getWebsiteUrl, openExternalUrl } from "../../../utils/common";
 import copyTextToClipboard from "copy-text-to-clipboard";
 import { isElectron } from "react-device-detect";
-import { checkDeveloperUpdate } from "../../../utils/request/common";
+import {
+  checkDeveloperUpdate,
+  FORK_RELEASES_URL,
+  FORK_REPO_URL,
+} from "../../../utils/request/common";
 declare var window: any;
 
 class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
@@ -33,41 +37,37 @@ class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
                   toast.loading(this.props.t("Checking for update") + "...", {
                     id: "checking_update",
                   });
-                  let res = await checkDeveloperUpdate();
-                  const newVersion = res.version;
-                  if (newVersion === packageJson.version) {
-                    toast.success(
-                      this.props.t("You are using the latest version"),
-                      {
-                        id: "checking_update",
-                      }
-                    );
-                  } else {
-                    toast.success(
-                      this.props.t("A new version is available") +
-                        ": " +
-                        newVersion,
-                      {
-                        id: "checking_update",
-                      }
-                    );
-
-                    let lang = "en";
+                  try {
+                    let res = await checkDeveloperUpdate();
+                    const newVersion = res?.version;
                     if (
-                      ConfigService.getReaderConfig("lang") &&
-                      ConfigService.getReaderConfig("lang").startsWith("zh")
+                      !newVersion ||
+                      compareVersions(newVersion, packageJson.version) <= 0
                     ) {
-                      lang = "zh";
-                    }
-                    setTimeout(() => {
-                      openExternalUrl(
-                        getWebsiteUrl() +
-                          "/" +
-                          lang +
-                          "/download" +
-                          "?version=developer"
+                      toast.success(
+                        this.props.t("You are using the latest version"),
+                        {
+                          id: "checking_update",
+                        }
                       );
-                    }, 1000);
+                    } else {
+                      toast.success(
+                        this.props.t("A new version is available") +
+                          ": " +
+                          newVersion,
+                        {
+                          id: "checking_update",
+                        }
+                      );
+
+                      setTimeout(() => {
+                        openExternalUrl(res?.downloadUrl || FORK_RELEASES_URL);
+                      }, 1000);
+                    }
+                  } catch (e) {
+                    toast.error(this.props.t("Failed to check for updates"), {
+                      id: "checking_update",
+                    });
                   }
                 }}
               >
@@ -242,7 +242,7 @@ class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
             className="change-location-button"
             onClick={() => {
               openExternalUrl(
-                "https://github.com/koodo-reader/koodo-reader#translation"
+                FORK_REPO_URL + "#translation"
               );
             }}
           >
@@ -255,7 +255,7 @@ class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
           <span
             className="change-location-button"
             onClick={() => {
-              openExternalUrl("https://github.com/koodo-reader/koodo-reader");
+              openExternalUrl(FORK_REPO_URL);
             }}
           >
             <Trans>Visit</Trans>
