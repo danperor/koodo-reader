@@ -78,14 +78,6 @@ export const aiRequest = async (
   statusText: string;
   body: string;
 }> => {
-  if (isElectron) {
-    return await window.electronAPI.invoke("ai-request", {
-      url,
-      method,
-      headers,
-      body,
-    });
-  }
   const response = await fetch(url, {
     method,
     headers,
@@ -122,65 +114,78 @@ export const chatStream = async (
     ...CommonTool.getDisableThinkingParams(providerId || ""),
   });
 
-  if (isElectron) {
-    return new Promise<{ done: boolean }>((resolve, reject) => {
-      const ipcRenderer = window.electronAPI;
-      const streamId =
-        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : Math.random().toString(36).slice(2) + Date.now().toString(36);
-
-      const onChunk = (data: any) => {
-        if (data && data.streamId === streamId && data.text) {
-          onMessage({ text: data.text });
-        }
-      };
-      const onDone = (data: any) => {
-        if (data && data.streamId === streamId) {
-          cleanup();
-          resolve({ done: true });
-        }
-      };
-      const onError = (data: any) => {
-        if (data && data.streamId === streamId) {
-          cleanup();
-          const errMsg =
-            data.error ||
-            (data.status ? `HTTP ${data.status}` : "Unknown error");
-          toast.error(errMsg, { id: "chat-stream-error", duration: 5000 });
-          reject(new Error(errMsg));
-        }
-      };
-      const cleanup = () => {
-        ipcRenderer.removeListener("ai-chat-chunk", onChunk);
-        ipcRenderer.removeListener("ai-chat-done", onDone);
-        ipcRenderer.removeListener("ai-chat-error", onError);
-      };
-
-      ipcRenderer.on("ai-chat-chunk", onChunk);
-      ipcRenderer.on("ai-chat-done", onDone);
-      ipcRenderer.on("ai-chat-error", onError);
-
-      ipcRenderer
-        .invoke("ai-chat-stream", {
-          streamId,
-          url: chatUrl,
-          headers,
-          body: payload,
-        })
-        .catch((err: any) => {
-          cleanup();
-          reject(err);
-        });
-    });
-  }
-
   return new Promise<{ done: boolean }>((resolve, reject) => {
+    let settled = false;
     const source = new SSE(chatUrl, {
       headers,
       payload,
       method: "POST",
     });
+
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      source.close();
+      resolve({ done: true });
+    };
+
+    // 流式剔除 <think>...</think> 思考内容，只透传最终回答
+    const OPEN_TAG = "<think>";
+    const CLOSE_TAG = "</think>";
+    let inThink = false;
+    let thinkPassed = false;
+    let tagBuffer = "";
+
+    const flushText = (text: string) => {
+      if (text) {
+        onMessage({ text });
+      }
+    };
+
+    const processDelta = (raw: string) => {
+      if (thinkPassed) {
+        flushText(raw);
+        return;
+      }
+      tagBuffer += raw;
+      let output = "";
+      while (tagBuffer) {
+        const tag = inThink ? CLOSE_TAG : OPEN_TAG;
+        const idx = tagBuffer.indexOf(tag);
+        if (idx !== -1) {
+          if (!inThink) {
+            output += tagBuffer.slice(0, idx);
+          }
+          tagBuffer = tagBuffer.slice(idx + tag.length);
+          inThink = !inThink;
+          thinkPassed = !inThink;
+          if (thinkPassed) {
+            tagBuffer = tagBuffer.replace(/^\s+/, "");
+          }
+          continue;
+        }
+        // 保留可能是半个标签的尾部，等下一个分片拼齐后再判断
+        let keep = 0;
+        for (
+          let len = Math.min(tagBuffer.length, tag.length - 1);
+          len > 0;
+          len--
+        ) {
+          if (tag.startsWith(tagBuffer.slice(-len))) {
+            keep = len;
+            break;
+          }
+        }
+        if (!inThink) {
+          output += tagBuffer.slice(0, tagBuffer.length - keep);
+        }
+        tagBuffer = tagBuffer.slice(tagBuffer.length - keep);
+        break;
+      }
+      flushText(output);
+    };
 
     source.addEventListener("open", () => {
       console.info("ChatStream connection established.");
@@ -188,16 +193,19 @@ export const chatStream = async (
 
     source.addEventListener("message", (e: any) => {
       if (!e.data) return;
-      if (e.data === "[DONE]") {
-        source.close();
-        resolve({ done: true });
+      if (e.data.trim() === "[DONE]") {
+        finish();
         return;
       }
       try {
         const json = JSON.parse(e.data);
         const text = json?.choices?.[0]?.delta?.content;
         if (text) {
-          onMessage({ text });
+          processDelta(text);
+        }
+        const finishReason = json?.choices?.[0]?.finish_reason;
+        if (finishReason) {
+          finish();
         }
       } catch (err) {
         console.error("ChatStream parse error:", err);
@@ -205,6 +213,10 @@ export const chatStream = async (
     });
 
     source.addEventListener("error", (e: any) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       console.error("ChatStream error:", e);
       toast.error(e.data ? JSON.stringify(e.data) : "Unknown error", {
         id: "chat-stream-error",
@@ -212,6 +224,14 @@ export const chatStream = async (
       });
       source.close();
       reject(e);
+    });
+
+    // SSE 连接结束时（无论服务端是否发送 [DONE]）都要结束流，
+    // 否则上层 stopUpdateInterval 不会被调用，自动滚底定时器会一直运行
+    source.addEventListener("readystatechange", () => {
+      if (source.readyState === SSE.CLOSED) {
+        finish();
+      }
     });
   });
 };

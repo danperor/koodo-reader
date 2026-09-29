@@ -29,11 +29,9 @@ import {
   checkMissingBook,
   generateSyncRecord,
   getBookPartialMd5,
-  getChatLocale,
   getTaskStats,
   getWebsiteUrl,
   openInBrowser,
-  resetKoodoSync,
   scanFolderForNewBooks,
   showTaskProgress,
   throttle,
@@ -42,7 +40,6 @@ import {
 } from "../../utils/common";
 import { driveList } from "../../constants/driveList";
 import SupportDialog from "../../components/dialogs/supportDialog";
-import SyncService from "../../utils/storage/syncService";
 import { LocalFileManager } from "../../utils/file/localFile";
 import packageJson from "../../../package.json";
 import { getTempToken, updateUserConfig } from "../../utils/request/user";
@@ -671,17 +668,22 @@ class Header extends React.Component<HeaderProps, HeaderState> {
             onClick={async () => {
               this.setState({ notificationCount: 0 });
               let deviceUuid = await TokenService.getFingerprint();
-              window.electronAPI.invoke("new-chat", {
-                url:
-                  getWebsiteUrl() +
-                  (ConfigService.getReaderConfig("lang").startsWith("zh")
-                    ? "/zh/faq"
-                    : "/en/faq") +
-                  "?referer=app&version=" +
-                  packageJson.version +
-                  "&client=web&device=" +
-                  deviceUuid,
-              });
+              let url =
+                getWebsiteUrl() +
+                (ConfigService.getReaderConfig("lang").startsWith("zh")
+                  ? "/zh/faq"
+                  : "/en/faq") +
+                "?referer=app&version=" +
+                packageJson.version +
+                "&client=web&device=" +
+                deviceUuid;
+              if (isElectron) {
+                window.electronAPI?.invoke("new-chat", {
+                  url: url,
+                });
+              } else {
+                openInBrowser(url);
+              }
             }}
           >
             <img
@@ -770,12 +772,21 @@ class Header extends React.Component<HeaderProps, HeaderState> {
                 let userInfo = await this.props.handleFetchUserInfo();
                 await this.handleCloudSync(userInfo);
               } else {
-                toast(
-                  this.props.t("Please upgrade to Pro to use this feature")
-                );
-                this.props.handleSetting(true);
-                this.props.handleSettingMode("account");
-                this.setState({ isSync: false });
+                if (
+                  ConfigService.getReaderConfig("isEnableKoReaderSync") !==
+                  "yes"
+                ) {
+                  toast(
+                    this.props.t("Please upgrade to Pro to use this feature")
+                  );
+                  this.props.handleSetting(true);
+                  this.props.handleSettingMode("account");
+                  this.setState({ isSync: false });
+                } else {
+                  this.setState({ isSync: true });
+                  await this.handleKOReaderSync();
+                  this.setState({ isSync: false });
+                }
               }
             }}
             style={{ marginTop: "2px" }}

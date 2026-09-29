@@ -60,15 +60,33 @@ class AutoImportDialog extends React.Component<
       () => {
         this.saveFolders(this.state.folders);
         if (imported > 0) {
-          toast.success(
-            this.props.t("Auto import complete") + ": " + imported
-          );
+          toast.success(this.props.t("Auto import complete") + ": " + imported);
           this.props.handleFetchBooks();
         } else {
           toast.success(this.props.t("No new books found"));
         }
       }
     );
+  };
+
+  handleScanAllFolders = async () => {
+    if (this.state.folders.length === 0) {
+      toast.error(this.props.t("No auto import folder added yet"));
+      return;
+    }
+    this.setState({ isLoading: true });
+    let imported = 0;
+    for (const folder of this.state.folders) {
+      imported += await this.scanAndImportFolder(folder);
+    }
+    this.setState({ isLoading: false }, () => {
+      if (imported > 0) {
+        toast.success(this.props.t("Auto import complete") + ": " + imported);
+        this.props.handleFetchBooks();
+      } else {
+        toast.success(this.props.t("No new books found"));
+      }
+    });
   };
 
   handleRemoveFolder = (folderPath: string) => {
@@ -99,18 +117,18 @@ class AutoImportDialog extends React.Component<
               <div className="loader"></div>
             </div>
           ) : this.state.folders.length === 0 ? (
-            <div
-              className="auto-import-empty"
-            >
-              {this.props.t("No auto import folder added yet")}
+            <div className="auto-import-empty">
+              <div>{this.props.t("No auto import folder added yet")}</div>
+              <div style={{ marginTop: "8px" }}>
+                {this.props.t(
+                  "Auto scan and import books when starting the app or when clicking Scan"
+                )}
+              </div>
             </div>
           ) : (
             this.state.folders.map((folder, index) => (
               <div key={index} className="cloud-drive-item auto-import-item">
-                <span
-                  className="cloud-drive-label"
-                  title={folder}
-                >
+                <span className="cloud-drive-label" title={folder}>
                   <span className="icon-folder auto-import-folder-icon"></span>
                   {folder}
                 </span>
@@ -127,13 +145,24 @@ class AutoImportDialog extends React.Component<
           )}
         </div>
 
-        <div
-          className="cloud-drive-item auto-import-add-button"
-          onClick={this.handleAddFolder}
-        >
-          <span className="cloud-drive-label" style={{ textAlign: "right" }}>
+        <div className="cloud-drive-item auto-import-scan-button">
+          <div
+            className="cloud-drive-label"
+            style={{ textAlign: "left", marginLeft: "10px" }}
+            onClick={this.handleScanAllFolders}
+          >
+            <Trans>Scan for new books</Trans>
+          </div>
+        </div>
+
+        <div className="cloud-drive-item auto-import-add-button">
+          <div
+            className="cloud-drive-label"
+            style={{ textAlign: "right" }}
+            onClick={this.handleAddFolder}
+          >
             <Trans>Add local folder</Trans>
-          </span>
+          </div>
         </div>
 
         <div

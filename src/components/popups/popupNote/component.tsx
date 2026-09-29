@@ -1,5 +1,6 @@
 import React from "react";
 import "./popupNote.css";
+import { isReadingRawPDF } from "../../../utils/common";
 import Note from "../../../models/Note";
 import _ from "underscore";
 import { PopupNoteProps, PopupNoteState } from "./interface";
@@ -112,12 +113,7 @@ class PopupNote extends React.Component<PopupNoteProps, PopupNoteState> {
           {}
         )
       );
-      if (
-        this.props.currentBook.format === "PDF" &&
-        !ConfigService.getAllListConfig("convertPDFBooks").includes(
-          this.props.currentBook.key
-        )
-      ) {
+      if (isReadingRawPDF(this.props.currentBook)) {
         let bookLocation = this.props.htmlBook.rendition.getPositionByChapter(
           this.props.chapterDocIndex
         );
@@ -125,7 +121,7 @@ class PopupNote extends React.Component<PopupNoteProps, PopupNoteState> {
       }
       let bookKey = this.props.currentBook.key;
       let range = JSON.stringify(
-        await this.props.htmlBook.rendition.getHightlightCoords(
+        await this.props.htmlBook.rendition.getHighlightCoords(
           this.props.chapterDocIndex
         )
       );

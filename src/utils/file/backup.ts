@@ -19,16 +19,16 @@ import i18n from "../../i18n";
 
 declare var window: any;
 
-export const backup = async (service: string): Promise<Boolean> => {
+export type BackupResult = "success" | "failed" | "cancel";
+
+export const backup = async (service: string): Promise<BackupResult> => {
   await checkMissingBook();
   let fileName = "data.zip";
   if (service === "local") {
-    let year = new Date().getFullYear(),
-      month = new Date().getMonth() + 1,
-      day = new Date().getDate();
-    fileName = `${year}-${month <= 9 ? "0" + month : month}-${
-      day <= 9 ? "0" + day : day
-    }.zip`;
+    let now = new Date();
+    fileName = `KoodoReader-Backup-${now.getFullYear()}-${
+      now.getMonth() + 1
+    }-${now.getDate()}-${Date.now()}.zip`;
   }
   if (isElectron) {
     const ipcRenderer = window.electronAPI;
@@ -36,8 +36,7 @@ export const backup = async (service: string): Promise<Boolean> => {
     if (service === "local") {
       const backupPath = await ipcRenderer.invoke("select-path");
       if (!backupPath) {
-        toast.error(i18n.t("Please select a backup path"));
-        return false;
+        return "cancel";
       }
       targetPath = backupPath;
     } else {
@@ -59,37 +58,35 @@ export const backup = async (service: string): Promise<Boolean> => {
       }
     );
     if (!backupResult) {
-      return false;
+      return "failed";
     }
     if (service === "local") {
-      return true;
+      return "success";
     } else {
       let tokenConfig = await getCloudConfig(service);
 
-      return await ipcRenderer.invoke("cloud-upload", {
+      return (await ipcRenderer.invoke("cloud-upload", {
         ...tokenConfig,
         fileName: "data.zip",
         service: service,
         type: "backup",
         storagePath: getStorageLocation(),
-      });
+      }))
+        ? "success"
+        : "failed";
     }
   } else {
     let blob: Blob | boolean = await backupFromStorage();
     if (!blob) {
-      return false;
+      return "failed";
     }
     if (service === "local") {
       saveAs(blob as Blob, fileName);
-      return true;
+      return "success";
     } else {
       let syncUtil = await SyncService.getSyncUtil();
       let result = await syncUtil.uploadFile(fileName, "backup", blob as Blob);
-      if (result) {
-        return true;
-      } else {
-        return false;
-      }
+      return result ? "success" : "failed";
     }
   }
 };
@@ -97,26 +94,45 @@ export const generateSnapshot = async () => {
   try {
     const path = window.electronAPI.path;
     const fs = window.electronAPI.fs;
-    const zip = new JSZip();
     const dataPath = getStorageLocation() || "";
     const snapshotPath = path.join(dataPath, "snapshot");
     const fileName = `${new Date().getTime()}.zip`;
     const databaseList = CommonTool.databaseList;
+    // 渲染进程用 JSZip 打包（snapshot 仅含配置类小文件）
+    const entries: { name: string; data: Uint8Array }[] = [];
     for (let i = 0; i < databaseList.length; i++) {
       await window.electronAPI.invoke("close-database", {
         dbName: databaseList[i],
         storagePath: getStorageLocation(),
       });
-      const databasePath = path.join(dataPath, "config", databaseList[i] + ".db");
+      const databasePath = path.join(
+        dataPath,
+        "config",
+        databaseList[i] + ".db"
+      );
       if (fs.existsSync(databasePath)) {
-        zip.file(path.posix.join("config", databaseList[i] + ".db"), fs.readFileSync(databasePath));
+        entries.push({
+          name: path.posix.join("config", databaseList[i] + ".db"),
+          data: fs.readFileSync(databasePath),
+        });
       }
     }
     const configStr = JSON.stringify(await ConfigUtil.dumpConfig("config"));
-    zip.file("config/config.json", configStr);
-    if (!fs.existsSync(snapshotPath)) fs.mkdirSync(snapshotPath, { recursive: true });
-    const output = await zip.generateAsync({ type: "uint8array" });
-    fs.writeFileSync(path.join(snapshotPath, fileName), output);
+    entries.push({
+      name: "config/config.json",
+      data: new TextEncoder().encode(configStr),
+    });
+    if (!fs.existsSync(snapshotPath))
+      fs.mkdirSync(snapshotPath, { recursive: true });
+    const zip = new JSZip();
+    for (const entry of entries) {
+      zip.file(entry.name, entry.data);
+    }
+    const zipData = await zip.generateAsync({
+      type: "uint8array",
+      compression: "DEFLATE",
+    });
+    fs.writeFileSync(path.join(snapshotPath, fileName), zipData);
     const snapshots = getSnapshots();
     for (let i = 30; i < snapshots.length; i++) {
       fs.unlinkSync(path.join(snapshotPath, snapshots[i].file));
