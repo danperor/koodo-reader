@@ -7,7 +7,6 @@ import Lottie from "lottie-react";
 import animationNew from "../../../assets/lotties/new.json";
 import {
   compareVersions,
-  getWebsiteUrl,
   openExternalUrl,
 } from "../../../utils/common";
 import { isElectron } from "react-device-detect";
@@ -19,7 +18,6 @@ import {
 } from "../../../utils/request/common";
 import { ConfigService } from "../../../assets/lib/kookit-extra-browser.min";
 import toast from "react-hot-toast";
-import { isWindows } from "react-device-detect";
 
 class UpdateInfo extends React.Component<UpdateInfoProps, UpdateInfoState> {
   constructor(props: UpdateInfoProps) {
