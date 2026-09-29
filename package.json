@@ -155,7 +155,7 @@
     "publish": {
       "provider": "github",
       "repo": "koodo-reader",
-      "owner": "koodo-reader"
+      "owner": "danperor"
     },
     "buildDependenciesFromSource": false,
     "nodeGypRebuild": false,
