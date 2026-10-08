@@ -5,7 +5,12 @@ import toast from "react-hot-toast";
 import { ConfigService } from "../../../assets/lib/kookit-extra-browser.min";
 import packageJson from "../../../../package.json";
 
-import { compareVersions, getWebsiteUrl, openExternalUrl } from "../../../utils/common";
+import {
+  compareVersions,
+  getWebsiteLang,
+  getWebsiteUrl,
+  openExternalUrl,
+} from "../../../utils/common";
 import copyTextToClipboard from "copy-text-to-clipboard";
 import { isElectron } from "react-device-detect";
 import {
@@ -140,14 +145,7 @@ class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
           <span
             className="change-location-button"
             onClick={async () => {
-              if (
-                ConfigService.getReaderConfig("lang") &&
-                ConfigService.getReaderConfig("lang").startsWith("zh")
-              ) {
-                openExternalUrl(getWebsiteUrl() + "/zh/document");
-              } else {
-                openExternalUrl(getWebsiteUrl() + "/en/document");
-              }
+              openExternalUrl(getWebsiteUrl() + getWebsiteLang() + "/document");
             }}
           >
             <Trans>Visit</Trans>
@@ -159,14 +157,7 @@ class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
           <span
             className="change-location-button"
             onClick={async () => {
-              if (
-                ConfigService.getReaderConfig("lang") &&
-                ConfigService.getReaderConfig("lang").startsWith("zh")
-              ) {
-                openExternalUrl(getWebsiteUrl() + "/zh/faq");
-              } else {
-                openExternalUrl(getWebsiteUrl() + "/en/faq");
-              }
+              openExternalUrl(getWebsiteUrl() + getWebsiteLang() + "/faq");
             }}
           >
             <Trans>Visit</Trans>
@@ -178,14 +169,7 @@ class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
           <span
             className="change-location-button"
             onClick={async () => {
-              if (
-                ConfigService.getReaderConfig("lang") &&
-                ConfigService.getReaderConfig("lang").startsWith("zh")
-              ) {
-                openExternalUrl(getWebsiteUrl() + "/zh/support");
-              } else {
-                openExternalUrl(getWebsiteUrl() + "/en/support");
-              }
+              openExternalUrl(getWebsiteUrl() + getWebsiteLang() + "/support");
             }}
           >
             <Trans>Visit</Trans>
@@ -197,14 +181,9 @@ class AboutSetting extends React.Component<SettingInfoProps, SettingInfoState> {
           <span
             className="change-location-button"
             onClick={async () => {
-              if (
-                ConfigService.getReaderConfig("lang") &&
-                ConfigService.getReaderConfig("lang").startsWith("zh")
-              ) {
-                openExternalUrl(getWebsiteUrl() + "/zh/use-shortcut");
-              } else {
-                openExternalUrl(getWebsiteUrl() + "/en/use-shortcut");
-              }
+              openExternalUrl(
+                getWebsiteUrl() + getWebsiteLang() + "/use-shortcut"
+              );
             }}
           >
             <Trans>Visit</Trans>
